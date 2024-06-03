@@ -27,27 +27,42 @@ URL_PUBLIC = "https://www.linkedin.com/"
 
 
 def login(driver, wait, credentials):
-    '''
-    Function to handle login to LinkedIn accont
-    '''
-    # Email field
-    wait.until(EC.presence_of_element_located((By.ID, "username")))
-    email_field = driver.find_element(By.ID, "username")
-    email_field.send_keys(credentials["username"])
+    """
+    Handle login to LinkedIn account.
 
-    # Password field
-    wait.until(EC.presence_of_element_located((By.ID, "password")))
-    pass_field = driver.find_element(By.ID, "password")
-    pass_field.send_keys(credentials["password"])
-    time.sleep(1)
+    Parameters:
+    driver (webdriver): Selenium WebDriver object to control the browser.
+    wait (WebDriverWait): WebDriverWait object to manage waits.
+    credentials (dict): Dictionary containing 'username' and 'password' for login.
 
-    # Sign up button
-    print('sign in button!')
-    wait.until(EC.element_to_be_clickable(
-        (By.XPATH, '//*[@id="organic-div"]/form/div[3]/button'))).click()
-    time.sleep(0.5)
+    Returns:
+    None
+    """
+    try:
+        # Wait for the email field and enter the username
+        wait.until(EC.presence_of_element_located((By.ID, "username")))
+        email_field = driver.find_element(By.ID, "username")
+        email_field.send_keys(credentials["username"])
 
-    print('finishing log in...')
+        # Wait for the password field and enter the password
+        wait.until(EC.presence_of_element_located((By.ID, "password")))
+        pass_field = driver.find_element(By.ID, "password")
+        pass_field.send_keys(credentials["password"])
+
+        # Adding a short delay to mimic human interaction
+        time.sleep(1)
+
+        # Wait for the sign-in button and click it
+        wait.until(EC.element_to_be_clickable(
+            (By.XPATH, '//*[@id="organic-div"]/form/div[3]/button'))).click()
+        
+        # Adding a short delay to ensure the login process completes
+        time.sleep(0.5)
+
+        print('Login successful.')
+
+    except Exception as e:
+        print(f"An error occurred during login: {e}")
 
 
 def search_item(user, driver, wait, verbose=True, download=True):
@@ -67,7 +82,7 @@ def search_item(user, driver, wait, verbose=True, download=True):
     search_bar.send_keys(Keys.COMMAND + "a")
     search_bar.send_keys(Keys.DELETE)
     time.sleep(0.2)
-    
+
     # Input user
     search_bar.send_keys(user)
 
@@ -88,19 +103,20 @@ def search_item(user, driver, wait, verbose=True, download=True):
         user_data_copy.loc[user_data_copy['Name'] == user,
                            'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
         user_data_copy.loc[user_data_copy['Name'] == user, 'Scraped'] = 2
-        #driver.get('https://www.linkedin.com/feed/')
+        # driver.get('https://www.linkedin.com/feed/')
         return
 
     # Check if we're already filtering by people. If not, do it
     try:
-        people_button = driver.find_elements(By.XPATH, "//button[@aria-label='Filter by: People']")
+        people_button = driver.find_elements(
+            By.XPATH, "//button[@aria-label='Filter by: People']")
         print(f"We're already filtering by people!")
-        
+
     except NoSuchElementException:
         # Filter by people
         wait.until(EC.element_to_be_clickable(
             (By.XPATH, '//button[normalize-space()="People"]'
-            ))).click()
+             ))).click()
 
     time.sleep(0.1)
 
@@ -244,7 +260,7 @@ def search_item(user, driver, wait, verbose=True, download=True):
                             count += 1
 
                             if count >= 1:
-                                #driver.get('https://www.linkedin.com/feed/')
+                                # driver.get('https://www.linkedin.com/feed/')
                                 break
                         else:
                             if verbose:
@@ -254,7 +270,7 @@ def search_item(user, driver, wait, verbose=True, download=True):
                                                == user, 'Scraped'] = 2
                             user_data_copy.loc[user_data_copy['Name'] == user,
                                                'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
-                            #driver.get('https://www.linkedin.com/feed/')
+                            # driver.get('https://www.linkedin.com/feed/')
                             break
                 else:
                     if verbose:
@@ -264,7 +280,7 @@ def search_item(user, driver, wait, verbose=True, download=True):
                                        == user, 'Scraped'] = 2
                     user_data_copy.loc[user_data_copy['Name'] == user,
                                        'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
-                    #driver.get('https://www.linkedin.com/feed/')
+                    # driver.get('https://www.linkedin.com/feed/')
             except Exception as e:
                 if verbose:
                     print(f"Error while looking for {user}:")
@@ -284,7 +300,7 @@ def search_item(user, driver, wait, verbose=True, download=True):
             user_data_copy.loc[user_data_copy['Name'] == user, 'Scraped'] = 2
 
             # here
-            #driver.get('https://www.linkedin.com/feed/')
+            # driver.get('https://www.linkedin.com/feed/')
 
         return
     else:
@@ -312,7 +328,7 @@ def download_profile(user, driver, path):
             print('saving file...')
 
 
-def search_public_people(users, driver, wait):
+def search_public_people(users, wait):
     # People button
     wait.until(EC.element_to_be_clickable(
         (By.PARTIAL_LINK_TEXT, 'People'))).click()
@@ -333,15 +349,30 @@ def search_public_people(users, driver, wait):
 
 
 def scrape_data(names, headless, verbose, attempts, path, user_login=True):
+    """
+    Scrape data for a list of names from LinkedIn.
+
+    Parameters:
+    names (list): List of names to search and scrape data for.
+    headless (bool): Run the browser in headless mode if True.
+    verbose (bool): Print detailed logs if True.
+    attempts (int): Number of attempts to retry in case of failure.
+    path (str): Path to save the scraped data.
+    user_login (bool): If True, login to LinkedIn before scraping.
+
+    Returns:
+    None
+    """
+    
     driver, wait = setup(headless=headless, wait_time=6)
 
     if user_login:
-
         driver.get(URL_LOGIN)
         wait.until(EC.url_to_be(URL_LOGIN))
         login(driver=driver, wait=wait, credentials=CREDENTIALS)
         time.sleep(0.3)
         print('log in sucessful!')
+        
         total_scraped = 0
         for name in names:
             if total_scraped >= 300:
@@ -353,10 +384,10 @@ def scrape_data(names, headless, verbose, attempts, path, user_login=True):
                 print(f'Exception on user {name}: \n{e}\n')
                 user_data_copy.loc[user_data_copy['Name']
                                    == name, 'Scraped'] = -1
-                print(f'Skipping to next user...')
+                
+                if verbose:
+                    print(f'Skipping to next user...')
                 time.sleep(0.2)
-                #driver.get(URL_PUBLIC)
-                #wait.until(EC.url_to_be(URL_PUBLIC))
             user_data_copy.to_excel(path, index=False)
             total_scraped += 1
 
@@ -374,8 +405,15 @@ def main(users,
          attempts=3):
 
     print(f'Running scraper on headless: {headless} mode. Verbose: {verbose}')
-    scrape_data(users['Name'], headless, verbose,
-                attempts, path=path, user_login=True)
+    
+    scrape_data(
+        users['Name'], 
+        headless, 
+        verbose,
+        attempts, 
+        path=path, 
+        user_login=True
+        )
 
 
 if __name__ == "__main__":
@@ -400,6 +438,9 @@ if __name__ == "__main__":
                     selection = sys.argv[4]
 
     user_data = pd.read_excel(path)
+
+    # Reverse rows using iloc() Function
+    # user_data = user_data.iloc[::-1]
     user_data_copy = user_data.copy()
 
     # selected_users = user_data[user_data[selection].isnull()]
