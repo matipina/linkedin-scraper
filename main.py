@@ -505,8 +505,7 @@ if __name__ == "__main__":
     # selected_users = user_data[user_data[selection].isnull()]
 
     # Select users that have not been previously scraped yet
-    # selected_users = user_data[~user_data['Scraped'].isin([1, 2])]
-    selected_users = user_data[~user_data['Scraped'].isin([1])]
+    selected_users = user_data[~user_data['Scraped'].isin([1, 2])]
 
     main(
         users=selected_users,

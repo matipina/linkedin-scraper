@@ -7,7 +7,7 @@ To use it, it's neccesary to employ an already existing LinkedIn Account.
 
 This tool uses an user's personal LinkedIn credentials to automate the process of looking for former students at The New School, with the objective of gathering insights on the career paths of a large number of alumni.
 
-Using an Excel file (.xlsx) as input, the script looks for each individual, one at a time, using LinkedIn's search bar. If a use is found, the tool opens their profile in a separate tab, to then gather the information corresponding to their most recent education and work experiences. This information gets stored in the same initial file.
+Using an Excel file (.xlsx) as input, the script looks for each individual, one at a time, using LinkedIn's search bar. If a user is found, the tool opens their profile in a separate tab, to then gather the information corresponding to their most recent education and work experiences. This information gets stored in the same initial file.
 
 ## Setup
 
