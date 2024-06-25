@@ -1,19 +1,15 @@
-from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
-
 from bs4 import BeautifulSoup as bs
 import re as re
 import time
 import pandas as pd
-from utils import setup, parse_source_data
+from utils import setup, parse_source_data, ensure_dataframe_format
 from dotenv import load_dotenv
 import os
 import sys
-import traceback
 
 
 load_dotenv()
@@ -55,7 +51,7 @@ def login(driver, wait, credentials):
         # Wait for the sign-in button and click it
         wait.until(EC.element_to_be_clickable(
             (By.XPATH, '//*[@id="organic-div"]/form/div[3]/button'))).click()
-        
+
         # Adding a short delay to ensure the login process completes
         time.sleep(0.5)
 
@@ -65,12 +61,25 @@ def login(driver, wait, credentials):
         print(f"An error occurred during login: {e}")
 
 
-def search_item(user, driver, wait, verbose=True, download=True):
+def search_item(name,
+                users,
+                driver,
+                wait,
+                column_names=None,
+                verbose=True,
+                download=True):
     '''
-    Function to search for a specific item
+    Function to search and scrape from LinkedIn a specific user profile 
+    based on their name
     '''
+    linkedin_column = column_names['linkedin']
+    status_column = column_names['status']
+    employer_column = column_names['employer']
+    position_column = column_names['position']
+    education_column = column_names['education']
+
     if verbose:
-        print(f'searching for user: {user}')
+        print(f'searching for user: {name}')
     wait.until(EC.url_contains('https://www.linkedin.com/'))
 
     # Search bar
@@ -84,7 +93,7 @@ def search_item(user, driver, wait, verbose=True, download=True):
     time.sleep(0.2)
 
     # Input user
-    search_bar.send_keys(user)
+    search_bar.send_keys(name)
 
     # Submit and wait for results
     search_bar.send_keys(Keys.ENTER)
@@ -93,16 +102,17 @@ def search_item(user, driver, wait, verbose=True, download=True):
     wait.until(EC.url_contains('https://www.linkedin.com/search/results/'))
     time.sleep(0.3)
 
-    # If no results, skip
     users_not_found = driver.find_elements(
         By.XPATH, '//h2[normalize-space()="No results found"]')
+
+    # If no results, skip
     if len(users_not_found) != 0:
         if verbose:
             print(f'No results in initial user search!')
             print('Assigned scraped = 2')
-        user_data_copy.loc[user_data_copy['Name'] == user,
-                           'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
-        user_data_copy.loc[user_data_copy['Name'] == user, 'Scraped'] = 2
+        users.loc[users['Name']
+                  == name, linkedin_column] = 'Not Found'
+        users.loc[users['Name'] == name, 'Scraped'] = 2
         # driver.get('https://www.linkedin.com/feed/')
         return
 
@@ -140,7 +150,7 @@ def search_item(user, driver, wait, verbose=True, download=True):
             time.sleep(0.1)
             # Add a school
             wait.until(EC.element_to_be_clickable(
-                (By.XPATH, '//button[normalize-space()="Add a company"]'
+                (By.XPATH, '//button[normalize-space()="Add a school"]'
                  ))).click()
             time.sleep(0.2)
 
@@ -211,27 +221,39 @@ def search_item(user, driver, wait, verbose=True, download=True):
                                 current=False,
                                 verbose=True)
 
-                            print('Finished parsing!')
+                            if verbose:
+                                print('Finished parsing!')
+
+                            # Download user profile if selected
                             if download:
                                 path = 'education_results'
-                                download_profile(f'{user}', driver, path)
+                                download_profile(f'{name}', driver, path)
 
-                            current_linkedin = user_data_copy.loc[user_data_copy['Name'] == user,
-                                                                  'ALL SOURCES: LinkedIn Profile Links'].to_string(header=False, index=False)
-                            if current_linkedin != "Not Found":
+                            # Get currently stored LinkedIn profile link, if available
+                            current_linkedin = users.loc[
+                                users['Name'] == name,
+                                linkedin_column
+                            ].to_string(header=False, index=False)
+
+                            # If there is a previous LinkedIn profile link, store both
+                            if current_linkedin != "Not Found" and current_linkedin != "":
                                 if pd.notnull(current_linkedin):
-                                    user_data_copy.loc[user_data_copy['Name'] == user,
-                                                       'ALL SOURCES: LinkedIn Profile Links'] = current_linkedin + ', ' + driver.current_url
+                                    users.loc[users['Name'] == name,
+                                              linkedin_column] = current_linkedin + ', ' + driver.current_url
                                 else:
-                                    user_data_copy.loc[user_data_copy['Name'] == user,
-                                                       'ALL SOURCES: LinkedIn Profile Links'] = driver.current_url
+                                    users.loc[users['Name'] == name,
+                                              linkedin_column] = driver.current_url
                             else:
-                                user_data_copy.loc[user_data_copy['Name'] == user,
-                                                   'ALL SOURCES: LinkedIn Profile Links'] = driver.current_url
+                                users.loc[users['Name'] == name,
+                                          linkedin_column] = driver.current_url
                                 print(f'Added this link: {driver.current_url}')
 
-                            print(f'current_experience: {current_experience} ({len(current_experience)})\ncurrent education: {
-                                  current_education} ({len(current_education)})')
+                            print(
+                                f'current_experience: {
+                                    current_experience} ({len(current_experience)})\n'
+                                f'current_education: {
+                                    current_education} ({len(current_education)})'
+                            )
 
                             if len(current_experience) > 0:
                                 status = 'Employed'
@@ -240,17 +262,17 @@ def search_item(user, driver, wait, verbose=True, download=True):
                             else:
                                 status = 'No data'
 
-                            user_data_copy.loc[user_data_copy['Name'] ==
-                                               user, 'ALL SOURCES: Primary Status'] = status
-                            user_data_copy.loc[user_data_copy['Name'] == user,
-                                               'ALL SOURCES: Employer/Organization Name'] = ' '.join(str(x) for x in current_experience)
-                            user_data_copy.loc[user_data_copy['Name'] == user, 'ALL SOURCES: Position Title'] = ' '.join(
+                            users.loc[users['Name'] ==
+                                      name, status_column] = status
+                            users.loc[users['Name'] == name,
+                                      employer_column] = ' '.join(str(x) for x in current_experience)
+                            users.loc[users['Name'] == name, position_column] = ' '.join(
                                 str(x) for x in current_experience)
-                            user_data_copy.loc[user_data_copy['Name'] == user, 'ALL SOURCES: Further Educ Institutions'] = ' '.join(
+                            users.loc[users['Name'] == name, education_column] = ' '.join(
                                 str(x) for x in current_education)
 
-                            user_data_copy.loc[user_data_copy['Name']
-                                               == user, 'Scraped'] = 1
+                            users.loc[users['Name']
+                                      == name, 'Scraped'] = 1
                             if verbose:
                                 print('assigned scraped = 1')
 
@@ -266,38 +288,38 @@ def search_item(user, driver, wait, verbose=True, download=True):
                             if verbose:
                                 print('No results in search!')
                                 print('Assigned scraped = 2')
-                            user_data_copy.loc[user_data_copy['Name']
-                                               == user, 'Scraped'] = 2
-                            user_data_copy.loc[user_data_copy['Name'] == user,
-                                               'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
+                            users.loc[users['Name']
+                                      == name, 'Scraped'] = 2
+                            users.loc[users['Name'] == name,
+                                      linkedin_column] = 'Not Found'
                             # driver.get('https://www.linkedin.com/feed/')
                             break
                 else:
                     if verbose:
                         print('No results in search!')
                         print('Assigned scraped = 2')
-                    user_data_copy.loc[user_data_copy['Name']
-                                       == user, 'Scraped'] = 2
-                    user_data_copy.loc[user_data_copy['Name'] == user,
-                                       'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
+                    users.loc[users['Name']
+                              == name, 'Scraped'] = 2
+                    users.loc[users['Name'] == name,
+                              linkedin_column] = 'Not Found'
                     # driver.get('https://www.linkedin.com/feed/')
             except Exception as e:
                 if verbose:
-                    print(f"Error while looking for {user}:")
+                    print(f"Error while looking for {name}:")
                     print(e)
                     print('Assigned scraped = -1')
-                user_data_copy.loc[user_data_copy['Name'] == user,
-                                   'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
-                user_data_copy.loc[user_data_copy['Name']
-                                   == user, 'Scraped'] = -1
+                users.loc[users['Name'] == name,
+                          linkedin_column] = 'Not Found'
+                users.loc[users['Name']
+                          == name, 'Scraped'] = -1
                 driver.get('https://www.linkedin.com/feed/')
         else:
             if verbose:
                 print(f'No results in refined search!')
                 print('Assigned scraped = 2')
-            user_data_copy.loc[user_data_copy['Name'] == user,
-                               'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
-            user_data_copy.loc[user_data_copy['Name'] == user, 'Scraped'] = 2
+            users.loc[users['Name'] == name,
+                      linkedin_column] = 'Not Found'
+            users.loc[users['Name'] == name, 'Scraped'] = 2
 
             # here
             # driver.get('https://www.linkedin.com/feed/')
@@ -307,9 +329,9 @@ def search_item(user, driver, wait, verbose=True, download=True):
         if verbose:
             print('No results in general search!')
             print('Assigned scraped = 2')
-        user_data_copy.loc[user_data_copy['Name'] == user, 'Scraped'] = 2
-        user_data_copy.loc[user_data_copy['Name'] == user,
-                           'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
+        users.loc[users['Name'] == name, 'Scraped'] = 2
+        users.loc[users['Name'] == name,
+                  'ALL SOURCES: LinkedIn Profile Links'] = 'Not Found'
         driver.get('https://www.linkedin.com/feed/')
 
 
@@ -329,6 +351,9 @@ def download_profile(user, driver, path):
 
 
 def search_public_people(users, wait):
+    '''
+    '''
+
     # People button
     wait.until(EC.element_to_be_clickable(
         (By.PARTIAL_LINK_TEXT, 'People'))).click()
@@ -348,12 +373,20 @@ def search_public_people(users, wait):
     return
 
 
-def scrape_data(names, headless, verbose, attempts, path, user_login=True):
+def scrape_data(
+    users,
+    headless,
+    verbose,
+    attempts,
+    path,
+    user_login=True,
+    column_names=None
+):
     """
     Scrape data for a list of names from LinkedIn.
 
     Parameters:
-    names (list): List of names to search and scrape data for.
+    users (df): Dataframe of users to search and scrape data.
     headless (bool): Run the browser in headless mode if True.
     verbose (bool): Print detailed logs if True.
     attempts (int): Number of attempts to retry in case of failure.
@@ -363,8 +396,9 @@ def scrape_data(names, headless, verbose, attempts, path, user_login=True):
     Returns:
     None
     """
-    
+
     driver, wait = setup(headless=headless, wait_time=6)
+    names = users['Name']
 
     if user_login:
         driver.get(URL_LOGIN)
@@ -372,23 +406,31 @@ def scrape_data(names, headless, verbose, attempts, path, user_login=True):
         login(driver=driver, wait=wait, credentials=CREDENTIALS)
         time.sleep(0.3)
         print('log in sucessful!')
-        
+
         total_scraped = 0
         for name in names:
             if total_scraped >= 300:
                 break
             try:
-                search_item(user=name, driver=driver, wait=wait)
-                # user_data_copy.loc[user_data_copy['Name'] == name, 'Scraped'] = 1
+                search_item(
+                    name=name,
+                    users=users,
+                    driver=driver,
+                    wait=wait,
+                    column_names=column_names,
+                    verbose=verbose,
+                    download=False
+                )
+                # users.loc[users['Name'] == name, 'Scraped'] = 1
             except Exception as e:
                 print(f'Exception on user {name}: \n{e}\n')
-                user_data_copy.loc[user_data_copy['Name']
-                                   == name, 'Scraped'] = -1
-                
+                users.loc[users['Name']
+                          == name, 'Scraped'] = -1
+
                 if verbose:
                     print(f'Skipping to next user...')
                 time.sleep(0.2)
-            user_data_copy.to_excel(path, index=False)
+            users.to_excel(path, index=False)
             total_scraped += 1
 
     else:
@@ -402,30 +444,34 @@ def main(users,
          path,
          headless=True,
          verbose=False,
-         attempts=3):
+         attempts=3,
+         column_names=None):
 
-    print(f'Running scraper on headless: {headless} mode. Verbose: {verbose}')
-    
+    if verbose:
+        print(f'Running scraper on headless: {
+              headless} mode. Verbose: {verbose}')
+
     scrape_data(
-        users['Name'], 
-        headless, 
-        verbose,
-        attempts, 
-        path=path, 
-        user_login=True
-        )
+        users=users,
+        headless=headless,
+        verbose=verbose,
+        attempts=attempts,
+        path=path,
+        user_login=True,
+        column_names=column_names
+    )
 
 
 if __name__ == "__main__":
     headless = False
     verbose = False
-    path = 'data/Faculty_Missing_Highest_Degree_Scraped.xlsx'
+    path = 'data/2024/CLASS2023_merged.xlsx'
     selection = 'ALL SOURCES: Primary Status'
 
     '''
     First argument: headless
     Second argument: verbose
-    Third argument: data path
+    Third argument: path to the file containing the data to scrape
     Forth argument: column to filter by
     '''
     if len(sys.argv) >= 2:  # At least one argument
@@ -441,13 +487,31 @@ if __name__ == "__main__":
 
     # Reverse rows using iloc() Function
     # user_data = user_data.iloc[::-1]
-    user_data_copy = user_data.copy()
+    user_data = user_data.copy()
+
+    # Dictionary with the names of the columns that are needed in the scraping process
+    column_names = {
+        'linkedin': 'Linkedin',
+        'status': 'What best describes your primary status?',
+        'employer': 'Please provide the following details about your job. - Employer/Organization Name',
+        'position': 'Please provide the following details about your job. - Position Title',
+        'education': 'Which institution/college/university you are currently enrolled at?'
+    }
+
+    # Make sure that input file format is right
+    user_data = ensure_dataframe_format(
+        df=user_data, column_names=column_names)
 
     # selected_users = user_data[user_data[selection].isnull()]
-    selected_users = user_data[~user_data['Scraped'].isin([1, 2])]
-    test_users = selected_users.head(5)
 
-    main(selected_users,
-         path=path,
-         headless=headless,
-         verbose=verbose)
+    # Select users that have not been previously scraped yet
+    # selected_users = user_data[~user_data['Scraped'].isin([1, 2])]
+    selected_users = user_data[~user_data['Scraped'].isin([1])]
+
+    main(
+        users=selected_users,
+        path=path,
+        headless=headless,
+        verbose=verbose,
+        column_names=column_names
+    )

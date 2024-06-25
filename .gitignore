@@ -1,5 +1,9 @@
 results/
+results2/
+*.html
+education_results/
 .DS_Store
 *.xlsx
 __pycache__
 .env
+data/

@@ -1,0 +1,8 @@
+beautifulsoup4
+numpy
+openpyxl
+pandas
+python-dotenv==1.0.0
+selenium
+urllib3
+webdriver-manager==4.0.1
