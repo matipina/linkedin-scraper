@@ -131,7 +131,12 @@ By following these instructions, you can run the script with different configura
 
 ### Output
 
-The output will be stored in the input fi
+The output will be stored in the same files used as input. The colum "Scraped" will get updated, indicating the scrape status of each user. There are four possible values:
+
+* 0: Not scraped yet. The script has not tried to scrape the data from this user yet.
+* 1: Sraped successfully. A match was found on LinkedIn for this user, and their information was updated.
+* 2: Not found. The script tried to scrape data from this user, but no match was found.
+* -1: Error. During the process of scraping this user's data, an error occurred. On the next iteration, the script will try to scrape this data again.
 
 ## Notes
 
@@ -141,4 +146,5 @@ In case there's conflict with python versions from external apps (i.e. Touchdesi
 
 ## Disclaimers
 
-Due to possible the presence of captchas, this program cannot run completely unsupervised. It requires human input everytime that a captcha pops up.
+* Due to possible the presence of captchas, this program cannot run completely unsupervised. It requires human input everytime that a captcha pops up.
+* Even when there is a match in the scraping process, it is possible for there to be errors. It's always important to manually review the results, making sure that the stored data corresponds to the target user. **Recommendation:** check the stored LinkedIn url to quickly review a user's profile and check if it matches the original search.
