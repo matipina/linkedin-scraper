@@ -21,6 +21,7 @@ CREDENTIALS = {
 URL_LOGIN = "https://www.linkedin.com/uas/login"
 URL_PUBLIC = "https://www.linkedin.com/"
 
+filters = ["The New School", "Parsons School of Design"]
 
 def login(driver, wait, credentials):
     """
@@ -116,17 +117,14 @@ def search_item(name,
         # driver.get('https://www.linkedin.com/feed/')
         return
 
-    # Check if we're already filtering by people. If not, do it
-    try:
-        people_button = driver.find_elements(
-            By.XPATH, "//button[@aria-label='Filter by: People']")
-        print(f"We're already filtering by people!")
-
-    except NoSuchElementException:
+    # Check if we're already filtering by people by checking the URL. If not, do it
+    if "results/people/" in driver.current_url:
+        print("We're already filtering by people!")
+    else:
         # Filter by people
         wait.until(EC.element_to_be_clickable(
-            (By.XPATH, '//button[normalize-space()="People"]'
-             ))).click()
+            (By.XPATH, '//button[normalize-space()="People"]'))).click()
+        print("Filtered by people now.")
 
     time.sleep(0.1)
 
@@ -143,27 +141,32 @@ def search_item(name,
              '//button[normalize-space()="All filters"]'))).click()
 
         time.sleep(0.2)
-        filters = ["The New School", "Parsons School of Design"]
-        for filter in filters:
-            if verbose:
-                print(f'adding {filter} filter')
-            time.sleep(0.1)
-            # Add a school
-            wait.until(EC.element_to_be_clickable(
-                (By.XPATH, '//button[normalize-space()="Add a school"]'
-                 ))).click()
-            time.sleep(0.2)
 
-            # Write each school name
-            add_school_input = driver.switch_to.active_element
-            add_school_input.click()
-            add_school_input.send_keys(filter)
-            time.sleep(0.5)
-            add_school_input.click()
-            time.sleep(0.2)
-            add_school_input.send_keys(Keys.ARROW_DOWN)
-            add_school_input.send_keys(Keys.RETURN)
-            time.sleep(0.5)
+        # Check if the current URL contains the string "schoolFilter="
+        if "schoolFilter=" in driver.current_url:
+            if verbose:
+                print("The current URL contains 'schoolFilter='.")
+        else:            
+            for filter in filters:
+                if verbose:
+                    print(f'adding {filter} filter')
+                time.sleep(0.1)
+                # Add a school
+                wait.until(EC.element_to_be_clickable(
+                    (By.XPATH, '//button[normalize-space()="Add a school"]'
+                    ))).click()
+                time.sleep(0.2)
+
+                # Write each school name
+                add_school_input = driver.switch_to.active_element
+                add_school_input.click()
+                add_school_input.send_keys(filter)
+                time.sleep(0.5)
+                add_school_input.click()
+                time.sleep(0.2)
+                add_school_input.send_keys(Keys.ARROW_DOWN)
+                add_school_input.send_keys(Keys.RETURN)
+                time.sleep(0.5)
 
         # Show Results
         wait.until(EC.element_to_be_clickable(
@@ -229,31 +232,11 @@ def search_item(name,
                                 path = 'education_results'
                                 download_profile(f'{name}', driver, path)
 
-                            # Get currently stored LinkedIn profile link, if available
-                            current_linkedin = users.loc[
-                                users['Name'] == name,
-                                linkedin_column
-                            ].to_string(header=False, index=False)
-
-                            # If there is a previous LinkedIn profile link, store both
-                            if current_linkedin != "Not Found" and current_linkedin != "":
-                                if pd.notnull(current_linkedin):
-                                    users.loc[users['Name'] == name,
-                                              linkedin_column] = current_linkedin + ', ' + driver.current_url
-                                else:
-                                    users.loc[users['Name'] == name,
-                                              linkedin_column] = driver.current_url
-                            else:
-                                users.loc[users['Name'] == name,
+                            # Add linkedin link
+                            users.loc[users['Name'] == name,
                                           linkedin_column] = driver.current_url
+                            if verbose:
                                 print(f'Added this link: {driver.current_url}')
-
-                            print(
-                                f'current_experience: {
-                                    current_experience} ({len(current_experience)})\n'
-                                f'current_education: {
-                                    current_education} ({len(current_education)})'
-                            )
 
                             if len(current_experience) > 0:
                                 status = 'Employed'
@@ -465,7 +448,7 @@ def main(users,
 if __name__ == "__main__":
     headless = False
     verbose = False
-    path = 'data/2024/CLASS2023_merged.xlsx'
+    path = 'data/2024/data_updated.xlsx'
     selection = 'ALL SOURCES: Primary Status'
 
     '''
@@ -492,17 +475,17 @@ if __name__ == "__main__":
     # Dictionary with the names of the columns that are needed in the scraping process
     column_names = {
         'linkedin': 'Linkedin',
-        'status': 'What best describes your primary status?',
-        'employer': 'Please provide the following details about your job. - Employer/Organization Name',
-        'position': 'Please provide the following details about your job. - Position Title',
-        'education': 'Which institution/college/university you are currently enrolled at?'
+        'status': 'ALL SOURCES: Primary Status',
+        'employer': 'ALL SOURCES: Employer/Organization Name',
+        'position': 'ALL SOURCES: Position Title',
+        'education': 'ALL SOURCES: Further Educ_ Institutions'
     }
 
     # Make sure that input file format is right
     user_data = ensure_dataframe_format(
         df=user_data, column_names=column_names)
 
-    # selected_users = user_data[user_data[selection].isnull()]
+    selected_users = user_data[user_data[selection].isnull()]
 
     # Select users that have not been previously scraped yet
     selected_users = user_data[~user_data['Scraped'].isin([1, 2])]
