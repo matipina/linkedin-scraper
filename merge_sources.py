@@ -10,6 +10,7 @@ data_survey = pd.read_excel(
     'data/2024/data_all.xlsx',
     sheet_name='Source1_Qualtrics N=763',
 )
+data_survey.drop_duplicates(subset='PIDM', keep="last", inplace=True)
 data_survey.set_index(keys='PIDM', inplace=True, drop=False)
 
 data_udaro = pd.read_excel(
@@ -29,9 +30,11 @@ data_clearinghouse = pd.read_excel(
 data_full.update(other=data_clearinghouse, join='left', overwrite=True)
 data_full.update(other=data_udaro, join='left', overwrite=True)
 
-data_full.drop_duplicates(subset='PIDM', inplace=True)
+data_full.drop_duplicates(subset='PIDM', keep="last", inplace=True)
 data_full.set_index(keys='PIDM', drop=False, inplace=True)
 
 data_full.update(other=data_survey, join='left', overwrite=True)
 
-data_full.to_excel('data/data_updated.xlsx', index=False)
+data_full['Name'] = data_full['FirstName'] + ' ' + data_full['LastName']
+
+data_full.to_excel('data/2024/data_updated.xlsx', index=False)

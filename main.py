@@ -5,11 +5,13 @@ from selenium.common.exceptions import NoSuchElementException
 from bs4 import BeautifulSoup as bs
 import re as re
 import time
+import datetime
 import pandas as pd
 from utils import setup, parse_source_data, ensure_dataframe_format
 from dotenv import load_dotenv
 import os
 import sys
+import random
 
 
 load_dotenv()
@@ -47,7 +49,7 @@ def login(driver, wait, credentials):
         pass_field.send_keys(credentials["password"])
 
         # Adding a short delay to mimic human interaction
-        time.sleep(1)
+        time.sleep(random.uniform(0.7, 1.4))
 
         # Wait for the sign-in button and click it
         wait.until(EC.element_to_be_clickable(
@@ -101,7 +103,7 @@ def search_item(name,
     time.sleep(0.3)
 
     wait.until(EC.url_contains('https://www.linkedin.com/search/results/'))
-    time.sleep(0.3)
+    time.sleep(0.8)
 
     users_not_found = driver.find_elements(
         By.XPATH, '//h2[normalize-space()="No results found"]')
@@ -135,7 +137,7 @@ def search_item(name,
         By.XPATH, '//h2[normalize-space()="No results found"]')
     if len(users_not_found) == 0:
         # All filters
-        time.sleep(0.2)
+        time.sleep(0.5)
         wait.until(EC.element_to_be_clickable(
             (By.XPATH,
              '//button[normalize-space()="All filters"]'))).click()
@@ -150,29 +152,29 @@ def search_item(name,
             for filter in filters:
                 if verbose:
                     print(f'adding {filter} filter')
-                time.sleep(0.1)
+                time.sleep(0.2)
                 # Add a school
                 wait.until(EC.element_to_be_clickable(
                     (By.XPATH, '//button[normalize-space()="Add a school"]'
                     ))).click()
-                time.sleep(0.2)
+                time.sleep(0.3)
 
                 # Write each school name
                 add_school_input = driver.switch_to.active_element
                 add_school_input.click()
                 add_school_input.send_keys(filter)
-                time.sleep(0.5)
+                time.sleep(random.uniform(0.2, 0.6))
                 add_school_input.click()
-                time.sleep(0.2)
+                time.sleep(0.3)
                 add_school_input.send_keys(Keys.ARROW_DOWN)
                 add_school_input.send_keys(Keys.RETURN)
-                time.sleep(0.5)
+                time.sleep(random.uniform(0.2, 0.6))
 
         # Show Results
         wait.until(EC.element_to_be_clickable(
             (By.XPATH,
              '//button[normalize-space()="Show results"]'))).click()
-        time.sleep(0.3)
+        random.uniform(0.2, 0.6)
 
         # Get all results
 
@@ -201,13 +203,13 @@ def search_item(name,
                                 0].get_attribute('href')
                             driver.execute_script(
                                 f"window.open('{result_link}', 'tab2');")
-                            time.sleep(0.1)
+                            time.sleep(random.uniform(0.1, 0.3))
                             driver.switch_to.window("tab2")
 
                             wait.until(EC.url_contains(
                                 'https://www.linkedin.com/in/'))
 
-                            time.sleep(0.5)
+                            time.sleep(random.uniform(0.4, 0.6))
                             # Wait until "Education" section is loaded
                             try:
                                 wait.until(EC.presence_of_element_located(
@@ -265,7 +267,6 @@ def search_item(name,
                             count += 1
 
                             if count >= 1:
-                                # driver.get('https://www.linkedin.com/feed/')
                                 break
                         else:
                             if verbose:
@@ -275,7 +276,6 @@ def search_item(name,
                                       == name, 'Scraped'] = 2
                             users.loc[users['Name'] == name,
                                       linkedin_column] = 'Not Found'
-                            # driver.get('https://www.linkedin.com/feed/')
                             break
                 else:
                     if verbose:
@@ -285,7 +285,7 @@ def search_item(name,
                               == name, 'Scraped'] = 2
                     users.loc[users['Name'] == name,
                               linkedin_column] = 'Not Found'
-                    # driver.get('https://www.linkedin.com/feed/')
+                    time.sleep(random.uniform(0, 1))
             except Exception as e:
                 if verbose:
                     print(f"Error while looking for {name}:")
@@ -303,9 +303,6 @@ def search_item(name,
             users.loc[users['Name'] == name,
                       linkedin_column] = 'Not Found'
             users.loc[users['Name'] == name, 'Scraped'] = 2
-
-            # here
-            # driver.get('https://www.linkedin.com/feed/')
 
         return
     else:
@@ -485,10 +482,11 @@ if __name__ == "__main__":
     user_data = ensure_dataframe_format(
         df=user_data, column_names=column_names)
 
+    # Select users that have a missing primary status
     selected_users = user_data[user_data[selection].isnull()]
 
     # Select users that have not been previously scraped yet
-    selected_users = user_data[~user_data['Scraped'].isin([1, 2])]
+    selected_users = selected_users[~selected_users['Scraped'].isin([1, 2])]
 
     main(
         users=selected_users,
