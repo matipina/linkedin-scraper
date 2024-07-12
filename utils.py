@@ -27,18 +27,29 @@ def setup(headless=False, wait_time=5):
     '''
     options = webdriver.ChromeOptions()
     options.add_argument('--no-sandbox')
+    options.add_argument("--disable-webrtc")  # Disable WebRTC
 
+    print('Added options. About to create service...')
     service = Service(executable_path=ChromeDriverManager().install())
 
     if headless:
         options.add_argument("--headless")
 
     driver = webdriver.Chrome(service=service, options=options)
+    print(f'Driver created!')
 
     ignored_exceptions = (NoSuchElementException,
                           StaleElementReferenceException,)
     wait = WebDriverWait(
         driver, wait_time, ignored_exceptions=ignored_exceptions)
+    
+    # Print WebDriver details
+    print("WebDriver Details:")
+    print(f"Session ID: {driver.session_id}")
+    print(f"Current URL: {driver.current_url}")
+    print(f"Browser Name: {driver.capabilities['browserName']}")
+    print(f"Browser Version: {driver.capabilities['browserVersion']}")
+    print(f"Platform Name: {driver.capabilities['platformName']}")    
     return driver, wait
 
 
